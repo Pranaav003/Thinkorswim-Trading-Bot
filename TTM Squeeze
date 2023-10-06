@@ -1,0 +1,11 @@
+declare lower;
+
+input price = CLOSE;
+input length = 20;
+input nK = 1.5;
+input nBB = 2.0;
+input alertLine = 1.0;
+
+plot Histogram = Double.NaN;
+plot VolComp = Double.NaN;
+plot SqueezeAlert = Double.NaN;
