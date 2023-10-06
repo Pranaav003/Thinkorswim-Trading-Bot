@@ -1,0 +1,202 @@
+#Pranaav Iyer Program
+
+#Aggressive Buy/Sell
+plot zero = 0;
+zero.setdefaultcolor(color.black);
+
+addlabel(yes," Aggressive Buy ",createcolor(82,202,22));
+addlabel(yes," Aggressive Sell ",color.red);
+addlabel(yes," Stat Outlier ", color.white);
+addlabel(yes," Overnight ", createcolor(60,80,120));
+
+def seconds = SecondsFromTime(0);
+def time = SecondsTillTime (1600);
+def minutes = seconds / 3600;
+def RTH = minutes > 8 and minutes < 16.5;
+
+def sDev = StDev(data = close, 20);
+def mid = MovingAverage(AverageType.SIMPLE, close, 20);
+def lowerBand = mid -1 * sDev;
+def upperBand = mid - (-1.918) * sDev;
+
+def range = AbsValue(open - close);
+def WAvg = WildersAverage(range, 20);
+def averageVolume = ExpAverage(volume,50);
+def bp= (close - low)/(high - low) > 0.75;
+def sp = (high - close)/(high - low) > 0.75;
+def up = close > open and range > Wavg and volume > averageVolume and bp;
+def dn = close < open and range > wavg and volume > averageVolume and sp;
+
+plot hiupvol = if up and !up[1] then round(volume/1000,0) else double.nan;
+hiupvol.setpaintingstrategy(paintingstrategy.values_below);
+hiupvol.setdefaultcolor(color.green);
+hiupvol.assignvaluecolor(if low < lowerBand and range > wavg and volume > averageVolume and bp then color.white else color.current);
+hiupvol.hidetitle();
+plot hidnvol = if dn and !dn[1] then round(volume/1000,0) else double.nan;
+hidnvol.setpaintingstrategy(paintingstrategy.values_above);
+hidnvol.setdefaultcolor(color.red);
+hidnvol.assignvaluecolor(if high > upperBand and range > wavg and volume > averageVolume and sp then color.white else color.current);
+hidnvol.hidetitle();
+#--- END Code
+
+#PinBar identification (VSA)
+input LastBars = 0;
+input MaxNoseBodySize = 0.33; #(default = 0.33) — maximum allowed body/length ratio for the Nose bar.
+input NoseBodyPosition = 0.4; #(default = 0.4) — Nose body should be position in top (bottom for bearish pattern) part of the Nose bar.
+input LeftEyeOppositeDirection = yes; #(default = true) — tells the indicator that the Left Eye bar should be bearish for bullish Pinbar, and bullish for bearish Pinbar.
+input NoseSameDirection = yes; #(default = true) — tells the indicator that the Nose bar should be of the same direction as the pattern itself.
+input NoseBodyInsideLeftEyeBody = no; #(default = false) — tells the indicator that the Nose body should be inside the Left Eye body.
+input LeftEyeMinBodySize = 0.1; #(default = 0.1) — minimum size of the Left Eye body relative to the bar length.
+input NoseProtruding = 0.5; #(default = 0.5) — minimum protrusion of the Nose bar relative to the bar length.
+input NoseBodyToLeftEyeBody = 1; #(default = 1) — maximum size of the Nose body relative to the Left eye body.
+input NoseLengthToLeftEyeLength = 0; #(default = 0) — minimum Nose length relative to the Left Eye length.
+input LeftEyeDepth = 0.2; #(default = 0.2) — minimum depth of the Left Eye relative to its length. Depth is length of the part of the bar behind the Nose.
+
+# Left Eye and Nose bars's paramaters
+def NoseLength = High - Low;
+def LeftEyeLength = High[1] - Low[1];
+def NoseBody = Absvalue(Open - Close);
+def LeftEyeBody = Absvalue(Open[1] - Close[1]);
+
+# Bearish Pinbar
+
+def BearSignalDown = if  (High - High[1] >= NoseLength * NoseProtruding) and
+                     (NoseBody / NoseLength <= MaxNoseBodySize) and
+                     (1 - (High - Max(Open, Close)) / NoseLength < NoseBodyPosition) and
+                     if LeftEyeOppositeDirection then (Close[1] > Open[1]) else 1 and
+                     if NoseSameDirection then (Close < Open) else 1  and
+                     (LeftEyeBody / LeftEyeLength  >= LeftEyeMinBodySize) and
+                     ((Max(Open, Close) <= High[1]) && (Min(Open, Close) >= Low[1]))  and
+                     (NoseBody / LeftEyeBody <= NoseBodyToLeftEyeBody) and
+                     (NoseLength / LeftEyeLength >= NoseLengthToLeftEyeLength) and
+                     (Low - Low[1] >= LeftEyeLength * LeftEyeDepth) and
+                     if NoseBodyInsideLeftEyeBody then ((Max(Open, Close) <= Max(Open[1], Close[1]))
+                     && (Min(Open,  Close) >= Min(Open[1],  Close[1]))) else 1                   
+                     then yes
+                     else no ;
+
+def BullSignalUp   = if (Low[1] - Low >= NoseLength * NoseProtruding) and
+                     (NoseBody / NoseLength <= MaxNoseBodySize) and
+                     (1 - (Min(Open, Close) - Low) / NoseLength < NoseBodyPosition) and
+                     if LeftEyeOppositeDirection then (Close[1] < Open[1]) else 1 and
+                     if NoseSameDirection then (Close > Open) else 1 and
+                     (LeftEyeBody / LeftEyeLength >= LeftEyeMinBodySize) and
+                     ((Max(Open, Close) <= High[1]) && (Min(Open, Close) >= Low[1])) and
+                     (NoseBody / LeftEyeBody <= NoseBodyToLeftEyeBody) and
+                     (NoseLength / LeftEyeLength >= NoseLengthToLeftEyeLength) and
+                     (High[1] - High >= LeftEyeLength * LeftEyeDepth) and
+                     if NoseBodyInsideLeftEyeBody then ((Max(Open, Close) <= Max(Open[1], Close[1]))
+                     && (Min(Open, Close) >= Min(Open[1], Close[1]))) else 1
+                     then yes
+                     else no;
+
+#defining the bullish / bearish signals
+
+def bullish_signal = BullSignalup;
+
+def bearish_signal = BearSignalDown;
+#--- END Code
+
+
+#ImpulseMACD (BETTER MACD)
+input BarColor = no;#input(false, title="Enable bar colors")
+input lengthMA = 34;
+input lengthSignal = 9;
+input src = hlc3;
+
+def na = Double.NaN;
+#calc_smma(src, len) =>
+script calc_smma {
+    input src = close;
+    input len = 34;
+    def smma = if IsNaN(smma[1]) then SimpleMovingAvg(src, len) else (smma[1] * (len - 1) + src) / len;
+    plot return = smma;
+}
+#calc_zlema(src, length) =>
+script calc_zlema {
+    input src = close;
+    input length = 34;
+    def ema1 = ExpAverage(src, length);
+    def ema2 = ExpAverage(ema1, length);
+    def d    = ema1 - ema2;
+    def zelma = ema1 + d;
+    plot return = zelma;
+}
+
+def hi = calc_smma(high, lengthMA);
+def lo = calc_smma(low, lengthMA);
+def mi = calc_zlema(src, lengthMA);
+
+def md = if (mi > hi) then (mi - hi) else if (mi < lo) then (mi - lo) else 0;
+def sb = SimpleMovingAvg(md, lengthSignal);
+def sh = md - sb;
+def mdc = if src > mi then if src > hi then 2 else 1 else if src < lo then -2 else -1;
+#--- END Code
+
+#MACDLine = md
+#signal = sb
+#MACDHistogram = sh
+#
+
+# inputs
+
+input tradeSize = 100;
+input price = close;
+def percentGainGoal = ATR() * 1.5;
+def percentGainGoal2 = ATR() * 3;
+def percentLossGoal = ATR() * 4;
+#input percentLossGoal = 2;
+input avgLength = 20; #length of moving average
+
+# define
+def RSI = RSI(12, 60, 40);
+def ExpMovAvg = ExpAverage(price, avgLength);
+
+def MACDImpulseLine = md;
+def MACDImpulseSignal = sb;
+def percentChange = 100 * (close - EntryPrice()) / EntryPrice();
+def MovAvg21 = WildersSmoothing(price, 21);
+def MovAvg50 = WildersSmoothing(price, 50);
+def MovAvg200 = WildersSmoothing(price, 200);
+
+#MACD ExpMovAvg Strategy1
+def buysignal1 = (md < 0) and (md crosses above sb) and (MACDImpulseLine crosses above MACDImpulseSignal) and (sh > 0);
+#Bollingerbands RSI Strategy2
+def buysignal2 = (RSI() <= RSI().oversold) and (close < BollingerBands().LowerBand) and (close > GetValue(close, 10));
+#MACD indicator is below signal line, causing macd line to be red, candle close should be higher than previous candles, do research on bullish divergence or a reversal pattern
+#Scalping MA Strategy3
+def buysignal3 = (close > MovAvg21) and (MovAvg21 > MovAvg50) and (MovAvg50 > MovAvg200) and (RSI() > 50) and (RSI() > RSI()[1]) and (close > GetValue(close, 10));
+#Only take long positions when price is above 21, then 50, then 200 MA. RSI mustbe above 50, moving upwards. If possible, incorporate bullish divergence to give strength to the indicator.
+
+#VSAReversal Strategy4
+def avgVolume = Average(volume, 50);
+def buysignal4 = BearSignalDown and volume > avgVolume;
+
+#VSAReversal Strategy5
+def spread = high - low;
+def prevSpread = high[1] - low[1];
+
+def buysignal5 = up and !up[1] and close > mid and spread > prevSpread and volume < volume[1];
+
+#VSAContinuation Strategy6
+def buysignal6 = BearSignalDown and volume < Min(volume[1], volume[2]);
+
+#ExperimentalAGGRESSIVEB/S
+def buysignal7 = hiupvol;
+
+# define exit signals
+def profitableExit1 = percentChange >= percentGainGoal;
+def profitableExit2 = percentChange >= percentGainGoal;
+def profitableExit3 = hidnvol;
+def unprofitableExit1 = percentChange <= -percentLossGoal;
+
+# sales
+# buy order
+AddOrder(OrderType.BUY_TO_OPEN, buysignal1 or buysignal4 or buysignal6, open[-1], tradeSize, Color.CYAN, Color.CYAN);
+
+#sell order
+AddOrder(OrderType.SELL_TO_CLOSE, profitableExit1 or profitableExit2, open[-1], tradeSize, Color.GREEN, Color.GREEN);
+AddOrder(OrderType.SELL_TO_CLOSE, unprofitableExit1, open[-1], tradeSize, Color.RED, Color.RED);
+#original sell order
+#AddOrder(OrderType.SELL_TO_CLOSE, exitGood, open[-1], tradeSize, Color.GREEN, Color.GREEN);
+#AddOrder(OrderType.SELL_TO_CLOSE, exitBad, open[-1], tradeSize, Color.RED, Color.RED);

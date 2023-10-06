@@ -1,0 +1,12 @@
+declare lower;
+
+plot FPL = FPL();
+plot ZeroLine = 0;
+
+FPL.SetPaintingStrategy(PaintingStrategy.SQUARED_HISTOGRAM);
+FPL.DefineColor("Positive and Up", Color.GREEN);
+FPL.DefineColor("Positive and Down", Color.DARK_GREEN);
+FPL.DefineColor("Negative and Down", Color.RED);
+FPL.DefineColor("Negative and Up", Color.DARK_RED);
+FPL.AssignValueColor(if FPL >= 0 then if FPL > FPL[1] then FPL.Color("Positive and Up") else FPL.Color("Positive and Down") else if FPL < FPL[1] then FPL.Color("Negative and Down") else FPL.Color("Negative and Up"));
+ZeroLine.SetDefaultColor(Color.GRAY);

@@ -1,0 +1,7 @@
+declare lower;
+
+input length = 14;
+input averageType = AverageType.WILDERS;
+
+plot ATR = MovingAverage(averageType, TrueRange(high, close, low), length);
+ATR.SetDefaultColor(GetColor(8));
